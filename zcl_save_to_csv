@@ -14,8 +14,8 @@ CLASS cl_save_to_csv DEFINITION.
             ty_csv           TYPE TABLE OF string WITH DEFAULT KEY
             .
     CLASS-METHODS : add_instraction       IMPORTING REFERENCE(im_table)          TYPE data
-                                                    VALUE(im_column_header)      TYPE string
                                                     VALUE(im_column_name)        TYPE string
+                                                    VALUE(im_column_header)      TYPE string OPTIONAL
                                                     VALUE(im_fixed_value)        TYPE xflag DEFAULT ' ',
                     add_instraction_table IMPORTING im_lines TYPE ty_instraction_t,
                     get_instraction_table RETURNING VALUE(ex_instraction_t) TYPE ty_instraction_t,
@@ -76,7 +76,17 @@ CLASS cl_save_to_csv IMPLEMENTATION.
            .
 
     REFRESH lt_csv.
+    CLEAR lv_row.
 
+    LOOP AT lt_instractions INTO DATA(ls_instractions_head). "Create header
+      IF ls_instractions_head-column_header IS NOT INITIAL.
+        CONCATENATE lv_row ls_instractions_head-column_header INTO lv_row SEPARATED BY lv_seperator.
+      ENDIF.
+    ENDLOOP.
+    IF lv_row IS NOT INITIAL.
+      APPEND lv_row TO lt_csv.
+    ENDIF.
+    
     LOOP AT lt_instractions INTO DATA(ls_instractions). "Loop on columns
         row_index = 1.
 
