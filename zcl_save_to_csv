@@ -1,0 +1,115 @@
+*****************************************************************
+*                         CLASS DEFINITION                      *
+*****************************************************************
+CLASS cl_save_to_csv DEFINITION.
+
+  PUBLIC SECTION.
+    TYPES : BEGIN OF ty_instraction_s,
+              table         TYPE REF TO data,
+              column_header TYPE string,
+              column_name   TYPE string,
+              fixed_value   TYPE xflag,
+            END OF ty_instraction_s,
+            ty_instraction_t TYPE STANDARD TABLE OF ty_instraction_s WITH KEY table column_header column_name,
+            ty_csv           TYPE TABLE OF string WITH DEFAULT KEY
+            .
+    CLASS-METHODS : add_instraction       IMPORTING REFERENCE(im_table)          TYPE data
+                                                    VALUE(im_column_header)      TYPE string
+                                                    VALUE(im_column_name)        TYPE string
+                                                    VALUE(im_fixed_value)        TYPE xflag DEFAULT ' ',
+                    add_instraction_table IMPORTING im_lines TYPE ty_instraction_t,
+                    get_instraction_table RETURNING VALUE(ex_instraction_t) TYPE ty_instraction_t,
+                    get_output            RETURNING VALUE(ex_csv) TYPE ty_csv,
+                    set_seperator         IMPORTING im_seperator TYPE CHAR1,
+                    clear_instractions "VOID
+    .
+
+  PRIVATE SECTION.
+    CLASS-DATA : lt_instractions TYPE ty_instraction_t,
+                 lt_csv          TYPE ty_csv,
+                 lv_seperator    TYPE CHAR1 VALUE ';'
+                 .
+
+
+ENDCLASS.
+
+*****************************************************************
+*                       CLASS IMPLEMENTATION                    *
+*****************************************************************
+CLASS cl_save_to_csv IMPLEMENTATION.
+
+  METHOD add_instraction.
+
+    DATA(ls_instraction) = VALUE ty_instraction_s(
+      column_header = im_column_header
+      column_name = im_column_name
+      fixed_value = im_fixed_value
+    ).
+    GET REFERENCE OF im_table INTO ls_instraction-table.
+    APPEND ls_instraction TO lt_instractions.
+
+  ENDMETHOD.
+
+  METHOD add_instraction_table.
+    APPEND LINES OF im_lines TO lt_instractions.
+  ENDMETHOD.
+
+  METHOD clear_instractions.
+    REFRESH lt_instractions.
+  ENDMETHOD.
+
+  METHOD get_instraction_table.
+    ex_instraction_t = lt_instractions.
+  ENDMETHOD.
+
+  METHOD set_seperator.
+    lv_seperator = im_seperator.
+  ENDMETHOD.
+
+  METHOD get_output.
+
+    FIELD-SYMBOLS : <fs_table> TYPE table,
+                    <fs_field> TYPE any
+                    .
+    DATA : row_index TYPE i,
+           lv_row    TYPE string
+           .
+
+    REFRESH lt_csv.
+
+    LOOP AT lt_instractions INTO DATA(ls_instractions). "Loop on columns
+        row_index = 1.
+
+        ASSIGN ls_instractions-table->* TO <fs_table>.
+        LOOP AT <fs_table> ASSIGNING FIELD-SYMBOL(<fs_struct>). "Loop on rows
+          CLEAR lv_row.
+          "Get data from table reference :
+          IF ls_instractions-fixed_value IS INITIAL.
+            UNASSIGN <fs_field>.
+            ASSIGN COMPONENT ls_instractions-column_name OF STRUCTURE <fs_struct> TO <fs_field>.
+            IF <fs_field> IS ASSIGNED.
+              lv_row = conv string( <fs_field> ).
+            ENDIF.
+          ELSE.
+            lv_row = ls_instractions-column_name.
+          ENDIF.
+          "Update output table lt_csv :
+          IF row_index > lines( lt_csv ).
+            APPEND lv_row TO lt_csv.
+          ELSE.
+            DATA(lv_current_row) = lt_csv[ row_index ].
+            CONCATENATE lv_current_row lv_row INTO lv_row SEPARATED BY lv_seperator.
+            lt_csv[ row_index ] = lv_row.
+            clear lv_current_row.
+          ENDIF.
+          row_index = row_index + 1.
+        ENDLOOP.
+
+
+    ENDLOOP.
+
+    ex_csv = lt_csv.
+
+  ENDMETHOD.
+
+ENDCLASS.
